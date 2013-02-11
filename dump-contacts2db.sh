@@ -46,7 +46,7 @@ ORIG_IFS=$IFS
 
 # fetch contact data
 # TODO: order by account, with delimiters if possible
-record_set=`sqlite3 $CONTACTS2_PATH "SELECT raw_contacts._id, raw_contacts.display_name, raw_contacts.display_name_alt, mimetypes.mimetype, REPLACE(REPLACE(data.data1, $MS_NEWLINE_QUOTED, '\n'), $NEWLINE_QUOTED, '\n'), data.data2, REPLACE(REPLACE(data.data4, $MS_NEWLINE_QUOTED, '\n'), $NEWLINE_QUOTED, '\n'), data.data7, data.data8, data.data9, data.data10, quote(data.data15) FROM raw_contacts, data, mimetypes WHERE raw_contacts._id = data.raw_contact_id AND data.mimetype_id = mimetypes._id ORDER BY raw_contacts._id, mimetypes._id, data.data2"`
+record_set=`sqlite3 $CONTACTS2_PATH "SELECT raw_contacts._id, raw_contacts.display_name, raw_contacts.display_name_alt, mimetypes.mimetype, REPLACE(REPLACE(data.data1, $MS_NEWLINE_QUOTED, '\n'), $NEWLINE_QUOTED, '\n'), data.data2, REPLACE(REPLACE(data.data4, $MS_NEWLINE_QUOTED, '\n'), $NEWLINE_QUOTED, '\n'), data.data5, data.data6, data.data7, data.data8, data.data9, data.data10, quote(data.data15) FROM raw_contacts, data, mimetypes WHERE raw_contacts._id = data.raw_contact_id AND data.mimetype_id = mimetypes._id ORDER BY raw_contacts._id, mimetypes._id, data.data2"`
 
 # modify Internal Field Separator for parsing rows from recordset
 IFS=`echo -e "\n\r"`
@@ -96,25 +96,31 @@ do
                 cur_data4=$col
                 ;;
 
-            8)    # data.data7
+            8)    # data.data5
+                cur_data5=$col
+                ;;
+
+            9)    # data.data6
+                cur_data6=$col
+                ;;
+
+            10)    # data.data7
                 cur_data7=$col
                 ;;
 
-            9)    # data.data8
+            11)    # data.data8
                 cur_data8=$col
                 ;;
 
-            10)    # data.data9
+            12)    # data.data9
                 cur_data9=$col
                 ;;
 
-            11)    # data.data10
+            13)    # data.data10
                 cur_data10=$col
                 ;;
 
-            12)    # data.data15
-                # strip prefix ('X) and suffix (') from BLOB hex
-                #cur_data15=`echo $col | sed -e "s/^X'//" -e "s/'$//"`
+            14)    # data.data15
                 cur_data15=$col
                 ;;
 
@@ -122,13 +128,20 @@ do
     done
 
     # new contact
-    if [ $prev_contact_id -ne $cur_contact_id ]
-        then if [ $prev_contact_id -ne 0 ]
-            # echo cur vcard
-            then if [ ${#cur_vcard_note} -ne 0 ]
+    if [ $prev_contact_id -ne $cur_contact_id ]; then
+        if [ $prev_contact_id -ne 0 ]; then
+            # echo current vcard prior to reinitializing variables
+            
+            # some contacts apps don't have IM fields; add to top of NOTE: field
+            if [ ${#cur_vcard_im_note} -ne 0 ]
+                then cur_vcard_note=$cur_vcard_im_note"\n"$cur_vcard_note
+            fi
+
+            # generate and echo vcard
+            if [ ${#cur_vcard_note} -ne 0 ]
                 then cur_vcard_note="NOTE:"$cur_vcard_note$'\n'
             fi
-            cur_vcard=$cur_vcard$cur_vcard_nick$cur_vcard_org$cur_vcard_tel$cur_vcard_adr$cur_vcard_email$cur_vcard_url$cur_vcard_note$cur_vcard_photo
+            cur_vcard=$cur_vcard$cur_vcard_nick$cur_vcard_org$cur_vcard_tel$cur_vcard_adr$cur_vcard_email$cur_vcard_url$cur_vcard_note$cur_vcard_photo$cur_vcard_im
             cur_vcard=$cur_vcard"END:VCARD"
             echo $cur_vcard
         fi
@@ -142,6 +155,7 @@ do
         cur_vcard_adr=""
         cur_vcard_email=""
         cur_vcard_url=""
+        cur_vcard_im=""
         cur_vcard_im_note=""
         cur_vcard_note=""
         cur_vcard_photo=""
@@ -152,6 +166,7 @@ do
     case $cur_mimetype in
         vnd.android.cursor.item/nickname)
             if [ ${#cur_vcard_note} -ne 0 ]
+                # TODO:  where is this handled?
                 then cur_vcard_nick=$cur_vcard_nick"NICKNAME:"$cur_data1$'\n'
             fi
             ;;
@@ -230,15 +245,55 @@ do
             ;;
 
         # TODO: handle IM fields with X-GOOGLE-TALK, X-YAHOO, X-MSN, etc.
-        # Temporary workaround adds IM field to NOTE 
+        # temporary workaround adds IM field to NOTE 
         vnd.android.cursor.item/im)
-            cur_vcard_im_note=$cur_vcard_im_note"IM: "$cur_data1$'\n'
+             # handle entire string within each case to avoid unhandled cases
+             case $cur_data5 in
+                -1)
+                    cur_vcard_im_note=$cur_vcard_im_note"IM-Custom-"$cur_data6": "$cur_data1"\n"
+                    ;;
 
-            # put IM field at top of note
-            if [ ${#cur_vcard_note} -ne 0 ]
-                then cur_vcard_note=$cur_vcard_im_note"\n\n"$cur_vcard_note
-                else cur_vcard_note=$cur_vcard_im_note
-            fi
+                0)
+                    cur_vcard_im=$cur_vcard_im"X-AIM:"$cur_data1$'\n'
+                    cur_vcard_im_note=$cur_vcard_im_note"IM-AIM: "$cur_data1"\n"
+                    ;;
+
+                1)
+                    cur_vcard_im=$cur_vcard_im"X-MSN:"$cur_data1$'\n'
+                    cur_vcard_im_note=$cur_vcard_im_note"IM-MSN: "$cur_data1"\n"
+                    ;;
+
+                2)
+                    cur_vcard_im=$cur_vcard_im"X-YAHOO:"$cur_data1$'\n'
+                    cur_vcard_im_note=$cur_vcard_im_note"IM-Yahoo: "$cur_data1"\n"
+                    ;;
+
+                3)
+                    cur_vcard_im=$cur_vcard_im"X-SKYPE-USERNAME:"$cur_data1$'\n'
+                    cur_vcard_im_note=$cur_vcard_im_note"IM-Skype: "$cur_data1"\n"
+                    ;;
+
+                4)
+                    cur_vcard_im=$cur_vcard_im"X-QQ:"$cur_data1$'\n'
+                    cur_vcard_im_note=$cur_vcard_im_note"IM-QQ: "$cur_data1"\n"
+                    ;;
+
+                5)
+                    cur_vcard_im=$cur_vcard_im"X-GOOGLE-TALK:"$cur_data1$'\n'
+                    cur_vcard_im_note=$cur_vcard_im_note"IM-Google-Talk: "$cur_data1"\n"
+                    ;;
+
+                6)
+                    cur_vcard_im=$cur_vcard_im"X-ICQ:"$cur_data1$'\n'
+                    cur_vcard_im_note=$cur_vcard_im_note"IM-ICQ: "$cur_data1"\n"
+                    ;;
+
+                7)
+                    cur_vcard_im=$cur_vcard_im"X-JABBER:"$cur_data1$'\n'
+                    cur_vcard_im_note=$cur_vcard_im_note"IM-Jabber: "$cur_data1"\n"
+                    ;;
+
+            esac
             ;;
 
         vnd.android.cursor.item/photo)
@@ -278,11 +333,16 @@ done
 # set Internal Field Separator to other-than-newline prior to echoing final vcard
 IFS="|"
 
-# echo final vcard
+# some contacts apps don't have IM fields; add to top of NOTE: field
+if [ ${#cur_vcard_im_note} -ne 0 ]
+    then cur_vcard_note=$cur_vcard_im_note"\n"$cur_vcard_note
+fi
+
+# generate and echo vcard
 if [ ${#cur_vcard_note} -ne 0 ]
     then cur_vcard_note="NOTE:"$cur_vcard_note$'\n'
 fi
-cur_vcard=$cur_vcard$cur_vcard_nick$cur_vcard_org$cur_vcard_tel$cur_vcard_adr$cur_vcard_email$cur_vcard_url$cur_vcard_note$cur_vcard_photo
+cur_vcard=$cur_vcard$cur_vcard_nick$cur_vcard_org$cur_vcard_tel$cur_vcard_adr$cur_vcard_email$cur_vcard_url$cur_vcard_note$cur_vcard_photo$cur_vcard_im
 cur_vcard=$cur_vcard"END:VCARD"
 echo $cur_vcard
 
