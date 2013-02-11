@@ -19,7 +19,7 @@
 #
 #
 # dump-contacts2db.sh
-# Version 0.3.2, 2013-02-11
+# Version 0.4, 2013-02-11
 # Dumps contacts from an Android contacts2.db to stdout in vCard format
 # Usage:  dump-contacts2db.sh path/to/contacts2.db > path/to/output-file.vcf
 # Dependencies:  perl; base64; sqlite3 / libsqlite3-dev
@@ -141,7 +141,7 @@ do
             if [ ${#cur_vcard_note} -ne 0 ]
                 then cur_vcard_note="NOTE:"$cur_vcard_note$'\n'
             fi
-            cur_vcard=$cur_vcard$cur_vcard_nick$cur_vcard_org$cur_vcard_tel$cur_vcard_adr$cur_vcard_email$cur_vcard_url$cur_vcard_note$cur_vcard_photo$cur_vcard_im
+            cur_vcard=$cur_vcard$cur_vcard_nick$cur_vcard_org$cur_vcard_title$cur_vcard_tel$cur_vcard_adr$cur_vcard_email$cur_vcard_url$cur_vcard_note$cur_vcard_photo$cur_vcard_im
             cur_vcard=$cur_vcard"END:VCARD"
             echo $cur_vcard
         fi
@@ -151,6 +151,7 @@ do
         cur_vcard=$cur_vcard"N:"$cur_display_name_alt$'\n'"FN:"$cur_display_name$'\n'
         cur_vcard_nick=""
         cur_vcard_org=""
+        cur_vcard_title=""
         cur_vcard_tel=""
         cur_vcard_adr=""
         cur_vcard_email=""
@@ -176,7 +177,13 @@ do
             ;;
 
         vnd.android.cursor.item/organization)
-            cur_vcard_org=$cur_vcard_org"ORG:"$cur_data1$'\n'
+            if [ ${#cur_data1} -ne 0 ]
+                then cur_vcard_org=$cur_vcard_org"ORG:"$cur_data1$'\n'
+            fi
+            
+            if [ ${#cur_data4} -ne 0 ]
+                then cur_vcard_title="TITLE:"$cur_data4$'\n'
+            fi
             ;;
 
         vnd.android.cursor.item/phone_v2)
@@ -348,7 +355,7 @@ fi
 if [ ${#cur_vcard_note} -ne 0 ]
     then cur_vcard_note="NOTE:"$cur_vcard_note$'\n'
 fi
-cur_vcard=$cur_vcard$cur_vcard_nick$cur_vcard_org$cur_vcard_tel$cur_vcard_adr$cur_vcard_email$cur_vcard_url$cur_vcard_note$cur_vcard_photo$cur_vcard_im
+cur_vcard=$cur_vcard$cur_vcard_nick$cur_vcard_org$cur_vcard_title$cur_vcard_tel$cur_vcard_adr$cur_vcard_email$cur_vcard_url$cur_vcard_note$cur_vcard_photo$cur_vcard_im
 cur_vcard=$cur_vcard"END:VCARD"
 echo $cur_vcard
 
