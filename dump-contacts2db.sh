@@ -19,7 +19,7 @@
 #
 #
 # dump-contacts2db.sh
-# Version 0.3.1, 2013-02-11
+# Version 0.3.2, 2013-02-11
 # Dumps contacts from an Android contacts2.db to stdout in vCard format
 # Usage:  dump-contacts2db.sh path/to/contacts2.db > path/to/output-file.vcf
 # Dependencies:  perl; base64; sqlite3 / libsqlite3-dev
@@ -46,7 +46,7 @@ ORIG_IFS=$IFS
 
 # fetch contact data
 # TODO: order by account, with delimiters if possible
-record_set=`sqlite3 $CONTACTS2_PATH "SELECT raw_contacts._id, raw_contacts.display_name, raw_contacts.display_name_alt, mimetypes.mimetype, REPLACE(REPLACE(data.data1, $MS_NEWLINE_QUOTED, '\n'), $NEWLINE_QUOTED, '\n'), data.data2, REPLACE(REPLACE(data.data4, $MS_NEWLINE_QUOTED, '\n'), $NEWLINE_QUOTED, '\n'), data.data5, data.data6, data.data7, data.data8, data.data9, data.data10, quote(data.data15) FROM raw_contacts, data, mimetypes WHERE raw_contacts._id = data.raw_contact_id AND data.mimetype_id = mimetypes._id ORDER BY raw_contacts._id, mimetypes._id, data.data2"`
+record_set=`sqlite3 $CONTACTS2_PATH "SELECT raw_contacts._id, raw_contacts.display_name, raw_contacts.display_name_alt, mimetypes.mimetype, REPLACE(REPLACE(data.data1, $MS_NEWLINE_QUOTED, '\n'), $NEWLINE_QUOTED, '\n'), data.data2, REPLACE(REPLACE(data.data4, $MS_NEWLINE_QUOTED, '\n'), $NEWLINE_QUOTED, '\n'), data.data5, data.data6, data.data7, data.data8, data.data9, data.data10, quote(data.data15) FROM raw_contacts, data, mimetypes WHERE raw_contacts.deleted = 0 AND raw_contacts._id = data.raw_contact_id AND data.mimetype_id = mimetypes._id ORDER BY raw_contacts._id, mimetypes._id, data.data2"`
 
 # modify Internal Field Separator for parsing rows from recordset
 IFS=`echo -e "\n\r"`
@@ -295,6 +295,10 @@ do
                     cur_vcard_im_note=$cur_vcard_im_note"IM-Jabber: "$cur_data1"\n"
                     ;;
 
+                *)
+                    # Android 2.3 Gingerbread doesn't identify service; data5==""
+                    cur_vcard_im_note=$cur_vcard_im_note"IM: "$cur_data1"\n"
+                    ;;
             esac
             ;;
 
