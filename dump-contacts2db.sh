@@ -1,12 +1,6 @@
 #!/bin/bash
 
-# dump-contacts2db.sh
-# Version 0.1, 2012-08-19
-# Dumps contacts from an Android contacts2.db to stdout in vCard format
-# Usage:  dump-contacts2db.sh path/to/contacts2.db > path/to/output-file.vcf
-# Dependencies:  sqlite3 / libsqlite3-dev
-
-# Copyright (C) 2012, Stachre
+# Copyright (C) 2012-2013, Stachre
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,17 +13,26 @@
 # GNU General Public License for more details.
 # 
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program.  If not, see <http://www.gnu.org/licenses/>,
+# or write to the Free Software Foundation, Inc., 51 Franklin Street, 
+# Fifth Floor, Boston, MA  02110-1301, USA.
+#
+#
+# dump-contacts2db.sh
+# Version 0.2, 2013-02-11
+# Dumps contacts from an Android contacts2.db to stdout in vCard format
+# Usage:  dump-contacts2db.sh path/to/contacts2.db > path/to/output-file.vcf
+# Dependencies:  perl; base64; sqlite3 / libsqlite3-dev
 
 # expects single argument, path to contacts2.db
 if [ "$#" -ne 1 ]
     then echo -e "Dumps contacts from an Android contacts2.db to stdout in vCard format\n"
     echo -e "Usage:  dump-contacts2db.sh path/to/contacts2.db > path/to/output-file.vcf\n"
-    echo -e "Dependencies:  sqlite3 / libsqlite3-dev"
+    echo -e "Dependencies:  perl; base64; sqlite3 / libsqlite3-dev"
     exit 1
 fi
 
-# TODO verify specified contacts2.db file exists
+# TODO: verify specified contacts2.db file exists
 
 # inits
 declare -i cur_contact_id=0
@@ -42,8 +45,8 @@ CONTACTS2_PATH=$1
 ORIG_IFS=$IFS
 
 # fetch contact data
-# TODO order by account, with delimiters if possible
-record_set=`sqlite3 $CONTACTS2_PATH "SELECT raw_contacts._id, raw_contacts.display_name, raw_contacts.display_name_alt, mimetypes.mimetype, REPLACE(REPLACE(data.data1, $MS_NEWLINE_QUOTED, '\n'), $NEWLINE_QUOTED, '\n'), data.data2, REPLACE(REPLACE(data.data4, $MS_NEWLINE_QUOTED, '\n'), $NEWLINE_QUOTED, '\n'), data.data7, data.data8, data.data9, data.data10 FROM raw_contacts, data, mimetypes WHERE raw_contacts._id = data.raw_contact_id AND data.mimetype_id = mimetypes._id ORDER BY raw_contacts._id, mimetypes._id, data.data2"`
+# TODO: order by account, with delimiters if possible
+record_set=`sqlite3 $CONTACTS2_PATH "SELECT raw_contacts._id, raw_contacts.display_name, raw_contacts.display_name_alt, mimetypes.mimetype, REPLACE(REPLACE(data.data1, $MS_NEWLINE_QUOTED, '\n'), $NEWLINE_QUOTED, '\n'), data.data2, REPLACE(REPLACE(data.data4, $MS_NEWLINE_QUOTED, '\n'), $NEWLINE_QUOTED, '\n'), data.data7, data.data8, data.data9, data.data10, quote(data.data15) FROM raw_contacts, data, mimetypes WHERE raw_contacts._id = data.raw_contact_id AND data.mimetype_id = mimetypes._id ORDER BY raw_contacts._id, mimetypes._id, data.data2"`
 
 # modify Internal Field Separator for parsing rows from recordset
 IFS=`echo -e "\n\r"`
@@ -109,6 +112,12 @@ do
                 cur_data10=$col
                 ;;
 
+            12)    # data.data15
+                # strip prefix ('X) and suffix (') from BLOB hex
+                #cur_data15=`echo $col | sed -e "s/^X'//" -e "s/'$//"`
+                cur_data15=$col
+                ;;
+
         esac
     done
 
@@ -119,7 +128,7 @@ do
             then if [ ${#cur_vcard_note} -ne 0 ]
                 then cur_vcard_note="NOTE:"$cur_vcard_note$'\n'
             fi
-            cur_vcard=$cur_vcard$cur_vcard_nick$cur_vcard_org$cur_vcard_tel$cur_vcard_adr$cur_vcard_email$cur_vcard_url$cur_vcard_note
+            cur_vcard=$cur_vcard$cur_vcard_nick$cur_vcard_org$cur_vcard_tel$cur_vcard_adr$cur_vcard_email$cur_vcard_url$cur_vcard_note$cur_vcard_photo
             cur_vcard=$cur_vcard"END:VCARD"
             echo $cur_vcard
         fi
@@ -133,15 +142,18 @@ do
         cur_vcard_adr=""
         cur_vcard_email=""
         cur_vcard_url=""
-        cur_vcard_im=""
+        cur_vcard_im_note=""
         cur_vcard_note=""
+        cur_vcard_photo=""
     fi
 
     # add current row to current vcard
     # again, "mimetype" determines schema on a row-by-row basis
     case $cur_mimetype in
         vnd.android.cursor.item/nickname)
-            cur_vcard_nick=$cur_vcard_nick"NICKNAME:"$cur_data1$'\n'
+            if [ ${#cur_vcard_note} -ne 0 ]
+                then cur_vcard_nick=$cur_vcard_nick"NICKNAME:"$cur_data1$'\n'
+            fi
             ;;
 
         vnd.android.cursor.item/organization)
@@ -201,8 +213,8 @@ do
                     ;;
             esac
 
-            # ignore addresses that contain only country (MS Exchange)
-            # TODO validate general address pattern instead
+            # ignore addresses that contain only USA (MS Exchange)
+            # TODO: validate general address pattern instead
             if [ $cur_data1 != "United States of America" ]
                 then cur_vcard_adr=$cur_vcard_adr"ADR;TYPE="$cur_vcard_adr_type":;;"$cur_data4";"$cur_data7";"$cur_data8";"$cur_data9";"$cur_data10$'\n'
                 cur_vcard_adr=$cur_vcard_adr"LABEL;TYPE="$cur_vcard_adr_type":"$cur_data1$'\n'
@@ -217,15 +229,34 @@ do
             cur_vcard_url=$cur_vcard_url"URL:"$cur_data1$'\n'
             ;;
 
-        # TODO handle IM fields with X-GOOGLE-TALK, X-YAHOO, X-MSN, etc.
+        # TODO: handle IM fields with X-GOOGLE-TALK, X-YAHOO, X-MSN, etc.
         # Temporary workaround adds IM field to NOTE 
         vnd.android.cursor.item/im)
-            cur_vcard_im="IM: "$cur_data1
+            cur_vcard_im_note=$cur_vcard_im_note"IM: "$cur_data1$'\n'
 
             # put IM field at top of note
             if [ ${#cur_vcard_note} -ne 0 ]
-                then cur_vcard_note=$cur_vcard_im"\n\n"$cur_vcard_note
-                else cur_vcard_note=$cur_vcard_im
+                then cur_vcard_note=$cur_vcard_im_note"\n\n"$cur_vcard_note
+                else cur_vcard_note=$cur_vcard_im_note
+            fi
+            ;;
+
+        vnd.android.cursor.item/photo)
+            if [ $cur_data15 != "NULL" ]; then
+                # Remove the prefix "X'" and suffix "'" from the sqlite3 quote(BLOB) hex output
+                photo=`echo $cur_data15 | sed -e "s/^X'//" -e "s/'$//"`
+                
+                # Convert the hex to base64
+                # TODO: optimize
+                photo=`echo $photo | perl -ne 's/([0-9a-f]{2})/print chr hex $1/gie' | base64 --wrap=0`
+                
+                cur_vcard_photo=$cur_vcard_photo"PHOTO;ENCODING=BASE64;JPEG:"$photo$'\n'
+                
+                # TODO: line wrapping; Android import doesn't like base64's wrapping
+                
+                # For testing
+                #echo $cur_data15 > "images/$cur_display_name.txt"
+                #echo $cur_data15 | perl -ne 's/([0-9a-f]{2})/print chr hex $1/gie' > "images/$cur_display_name.jpg"
             fi
             ;;
 
@@ -251,7 +282,7 @@ IFS="|"
 if [ ${#cur_vcard_note} -ne 0 ]
     then cur_vcard_note="NOTE:"$cur_vcard_note$'\n'
 fi
-cur_vcard=$cur_vcard$cur_vcard_nick$cur_vcard_org$cur_vcard_tel$cur_vcard_adr$cur_vcard_email$cur_vcard_url$cur_vcard_note
+cur_vcard=$cur_vcard$cur_vcard_nick$cur_vcard_org$cur_vcard_tel$cur_vcard_adr$cur_vcard_email$cur_vcard_url$cur_vcard_note$cur_vcard_photo
 cur_vcard=$cur_vcard"END:VCARD"
 echo $cur_vcard
 
