@@ -19,7 +19,7 @@
 #
 #
 # dump-contacts2db.sh
-# Version 0.2, 2013-02-11
+# Version 0.3.1, 2013-02-11
 # Dumps contacts from an Android contacts2.db to stdout in vCard format
 # Usage:  dump-contacts2db.sh path/to/contacts2.db > path/to/output-file.vcf
 # Dependencies:  perl; base64; sqlite3 / libsqlite3-dev
@@ -163,11 +163,15 @@ do
 
     # add current row to current vcard
     # again, "mimetype" determines schema on a row-by-row basis
+    # TODO: handle following types
+    #   * (6) vnd.android.cursor.item/sip_address
+    #   * (7) vnd.android.cursor.item/identity (not exported by Android 4.1 Jelly Bean) 
+    #   * (13) vnd.android.cursor.item/group_membership (not exported by Android 4.1 Jelly Bean) 
+    #   * (14) vnd.com.google.cursor.item/contact_misc (not exported by Android 4.1 Jelly Bean) 
     case $cur_mimetype in
         vnd.android.cursor.item/nickname)
-            if [ ${#cur_vcard_note} -ne 0 ]
-                # TODO:  where is this handled?
-                then cur_vcard_nick=$cur_vcard_nick"NICKNAME:"$cur_data1$'\n'
+            if [ ${#cur_data1} -ne 0 ]
+                then cur_vcard_nick="NICKNAME:"$cur_data1$'\n'
             fi
             ;;
 
@@ -244,8 +248,6 @@ do
             cur_vcard_url=$cur_vcard_url"URL:"$cur_data1$'\n'
             ;;
 
-        # TODO: handle IM fields with X-GOOGLE-TALK, X-YAHOO, X-MSN, etc.
-        # temporary workaround adds IM field to NOTE 
         vnd.android.cursor.item/im)
              # handle entire string within each case to avoid unhandled cases
              case $cur_data5 in
