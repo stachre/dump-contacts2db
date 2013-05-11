@@ -9,12 +9,14 @@ dump-contacts2db.sh path/to/contacts2.db > path/to/output-file.vcf
 ### Dependencies
 * perl
 * base64
-* sqlite3 / libsqlite3-dev
+* sqlite3 
 
 ### Tested platforms
 * Ubuntu 12.04 Precise Pangolin
+* Debian Squeeze/Wheezy
 
 ### Tested Android versions (all Google Experience Devices)
+* 2.2	Froyo
 * 2.3.5 Gingerbread
 * 4.0.3 Ice Cream Sandwich
 * 4.1.1 Jelly Bean
