@@ -147,7 +147,7 @@ do
             if [ ${#cur_vcard_note} -ne 0 ]
                 then cur_vcard_note="NOTE:"$cur_vcard_note$'\n'
             fi
-            cur_vcard=$cur_vcard$cur_vcard_nick$cur_vcard_org$cur_vcard_title$cur_vcard_tel$cur_vcard_adr$cur_vcard_email$cur_vcard_url$cur_vcard_note$cur_vcard_photo$cur_vcard_im
+            cur_vcard=$cur_vcard$cur_vcard_nick$cur_vcard_org$cur_vcard_title$cur_vcard_tel$cur_vcard_adr$cur_vcard_email$cur_vcard_url$cur_vcard_note$cur_vcard_im$cur_vcard_bday$cur_vcard_photo
             cur_vcard=$cur_vcard"END:VCARD"
             echo $cur_vcard
         fi
@@ -167,6 +167,7 @@ do
         cur_vcard_im_note=""
         cur_vcard_note=""
         cur_vcard_photo=""
+	cur_vcard_bday=""
     fi
 
     # add current row to current vcard
@@ -342,6 +343,15 @@ do
                 else cur_vcard_note=$cur_data1
             fi
             ;;
+
+	vnd.android.cursor.item/contact_event)
+	    # Identify and record birthday event
+            case $cur_data2 in
+		3)
+		    cur_vcard_bday="BDAY:"$cur_data1$'\n'
+		    ;;
+	    esac
+	    ;;
     esac    
 
     prev_contact_id=$cur_contact_id
