@@ -20,6 +20,7 @@ dump-contacts2db.sh path/to/contacts2.db > path/to/output-file.vcf
 * 2.3.5 Gingerbread
 * 4.0.3 Ice Cream Sandwich
 * 4.1.1 Jelly Bean
+* 4.4.4 KitKat (Cyanogenmod 11 running on Nexus 5 (hammerhead))
 
 ### Known issues
 * Doesn't handle file-not-found or type mismatch gracefully; need to implement validation

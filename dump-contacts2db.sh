@@ -46,7 +46,7 @@ ORIG_IFS=$IFS
 
 # fetch contact data
 # TODO: order by account, with delimiters if possible
-record_set=`sqlite3 $CONTACTS2_PATH "SELECT raw_contacts._id, raw_contacts.display_name, raw_contacts.display_name_alt, mimetypes.mimetype, REPLACE(REPLACE(data.data1, $MS_NEWLINE_QUOTED, '\n'), $NEWLINE_QUOTED, '\n'), data.data2, REPLACE(REPLACE(data.data4, $MS_NEWLINE_QUOTED, '\n'), $NEWLINE_QUOTED, '\n'), data.data5, data.data6, data.data7, data.data8, data.data9, data.data10, quote(data.data15) FROM raw_contacts, data, mimetypes WHERE raw_contacts.deleted = 0 AND raw_contacts._id = data.raw_contact_id AND data.mimetype_id = mimetypes._id ORDER BY raw_contacts._id, mimetypes._id, data.data2"`
+record_set=`sqlite3 $CONTACTS2_PATH "SELECT raw_contacts._id, raw_contacts.display_name, raw_contacts.display_name_alt, mimetypes.mimetype, REPLACE(REPLACE(data.data1, $MS_NEWLINE_QUOTED, '\n'), $NEWLINE_QUOTED, '\n'), data.data2, REPLACE(REPLACE(data.data4, $MS_NEWLINE_QUOTED, '\n'), $NEWLINE_QUOTED, '\n'), data.data5, data.data6, data.data7, data.data8, data.data9, data.data10, quote(data.data15), contacts.contact_last_updated_timestamp FROM raw_contacts, data, mimetypes, contacts WHERE raw_contacts.deleted = 0 AND raw_contacts._id = data.raw_contact_id AND data.mimetype_id = mimetypes._id AND raw_contacts._id = contacts._id ORDER BY raw_contacts._id, mimetypes._id, data.data2"`
 
 # modify Internal Field Separator for parsing rows from recordset
 IFS=`echo -e "\n\r"`
@@ -124,6 +124,12 @@ do
                 cur_data15=$col
                 ;;
 
+	    15)    # contacts.contact_last_updated_timestamp
+		last_updated_timestamp=$col
+		secs_since_epoch=$(($last_updated_timestamp/1000))
+		cur_rev=`date "+%Y-%m-%dT%H:%M:%SZ" --utc --date="@$secs_since_epoch"`
+		;;
+
         esac
     done
 
@@ -141,7 +147,7 @@ do
             if [ ${#cur_vcard_note} -ne 0 ]
                 then cur_vcard_note="NOTE:"$cur_vcard_note$'\n'
             fi
-            cur_vcard=$cur_vcard$cur_vcard_nick$cur_vcard_org$cur_vcard_title$cur_vcard_tel$cur_vcard_adr$cur_vcard_email$cur_vcard_url$cur_vcard_note$cur_vcard_photo$cur_vcard_im
+            cur_vcard=$cur_vcard$cur_vcard_nick$cur_vcard_org$cur_vcard_title$cur_vcard_tel$cur_vcard_adr$cur_vcard_email$cur_vcard_url$cur_vcard_note$cur_vcard_im$cur_vcard_bday$cur_vcard_photo
             cur_vcard=$cur_vcard"END:VCARD"
             echo $cur_vcard
         fi
@@ -149,6 +155,7 @@ do
         # init new vcard
         cur_vcard="BEGIN:VCARD"$'\n'"VERSION:3.0"$'\n'
         cur_vcard=$cur_vcard"N:"$cur_display_name_alt$'\n'"FN:"$cur_display_name$'\n'
+	cur_vcard=$cur_vcard"REV:"$cur_rev$'\n'
         cur_vcard_nick=""
         cur_vcard_org=""
         cur_vcard_title=""
@@ -160,6 +167,7 @@ do
         cur_vcard_im_note=""
         cur_vcard_note=""
         cur_vcard_photo=""
+	cur_vcard_bday=""
     fi
 
     # add current row to current vcard
@@ -335,6 +343,15 @@ do
                 else cur_vcard_note=$cur_data1
             fi
             ;;
+
+	vnd.android.cursor.item/contact_event)
+	    # Identify and record birthday event
+            case $cur_data2 in
+		3)
+		    cur_vcard_bday="BDAY:"$cur_data1$'\n'
+		    ;;
+	    esac
+	    ;;
     esac    
 
     prev_contact_id=$cur_contact_id
