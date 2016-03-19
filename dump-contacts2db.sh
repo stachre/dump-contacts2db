@@ -316,7 +316,12 @@ do
                 
                 # Convert the hex to base64
                 # TODO: optimize
-                photo=`echo $photo | perl -ne 's/([0-9a-f]{2})/print chr hex $1/gie' | base64 --wrap=0`
+                
+                if [ "$(uname)" == "Darwin" ]; then
+                    photo=`echo $photo | perl -ne 's/([0-9a-f]{2})/print chr hex $1/gie' | base64`
+                else
+                    photo=`echo $photo | perl -ne 's/([0-9a-f]{2})/print chr hex $1/gie' | base64 --wrap=0`
+                fi
                 
                 cur_vcard_photo=$cur_vcard_photo"PHOTO;ENCODING=BASE64;JPEG:"$photo$'\n'
                 
