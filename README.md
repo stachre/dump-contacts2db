@@ -14,6 +14,7 @@ dump-contacts2db.sh path/to/contacts2.db > path/to/output-file.vcf
 ### Tested platforms
 * Ubuntu 12.04 Precise Pangolin
 * Debian Squeeze/Wheezy
+* OS X Yosemite 10.10.5
 
 ### Tested Android versions (all Google Experience Devices)
 * 2.2	Froyo
