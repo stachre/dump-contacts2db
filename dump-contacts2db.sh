@@ -37,16 +37,21 @@ fi
 # inits
 declare -i cur_contact_id=0
 declare -i prev_contact_id=0
-NEWLINE_QUOTED=`echo -e "'\n'"`
-MS_NEWLINE_QUOTED=`echo -e "'\r\n'"`
+
 CONTACTS2_PATH=$1
 
 # store Internal Field Separator
 ORIG_IFS=$IFS
 
+function replace_newlines()
+{
+	local FIELD="$1"
+	echo "REPLACE(REPLACE(REPLACE(${FIELD},X'0D0A','\n'),X'0D','\n'),X'0A','\n')"
+}
+
 # fetch contact data
 # TODO: order by account, with delimiters if possible
-record_set=`sqlite3 $CONTACTS2_PATH "SELECT raw_contacts._id, raw_contacts.display_name, raw_contacts.display_name_alt, mimetypes.mimetype, REPLACE(REPLACE(data.data1, $MS_NEWLINE_QUOTED, '\n'), $NEWLINE_QUOTED, '\n'), data.data2, REPLACE(REPLACE(data.data4, $MS_NEWLINE_QUOTED, '\n'), $NEWLINE_QUOTED, '\n'), data.data5, data.data6, data.data7, data.data8, data.data9, data.data10, quote(data.data15) FROM raw_contacts, data, mimetypes WHERE raw_contacts.deleted = 0 AND raw_contacts._id = data.raw_contact_id AND data.mimetype_id = mimetypes._id ORDER BY raw_contacts._id, mimetypes._id, data.data2"`
+record_set=$(sqlite3 $CONTACTS2_PATH "SELECT raw_contacts._id, raw_contacts.display_name, raw_contacts.display_name_alt, mimetypes.mimetype, $(replace_newlines data.data1 ), data.data2, $(replace_newlines data.data4), data.data5, data.data6, data.data7, data.data8, data.data9, data.data10, quote(data.data15) FROM raw_contacts, data, mimetypes WHERE raw_contacts.deleted = 0 AND raw_contacts._id = data.raw_contact_id AND data.mimetype_id = mimetypes._id ORDER BY raw_contacts._id, mimetypes._id, data.data2")
 
 # modify Internal Field Separator for parsing rows from recordset
 IFS=`echo -e "\n\r"`
